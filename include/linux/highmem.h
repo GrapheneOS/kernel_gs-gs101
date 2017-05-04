@@ -273,6 +273,13 @@ static inline void tag_clear_highpage(struct page *page)
 
 #endif
 
+static inline void verify_zero_highpage(struct page *page)
+{
+	void *kaddr = kmap_atomic(page);
+	BUG_ON(memchr_inv(kaddr, 0, PAGE_SIZE));
+	kunmap_atomic(kaddr);
+}
+
 static inline void zero_user_segments(struct page *page,
 	unsigned start1, unsigned end1,
 	unsigned start2, unsigned end2)
