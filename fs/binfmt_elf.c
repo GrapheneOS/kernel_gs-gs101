@@ -1002,6 +1002,13 @@ out_free_interp:
 	/* Do this immediately, since STACK_TOP as used in setup_arg_pages
 	   may depend on the personality.  */
 	SET_PERSONALITY2(*elf_ex, &arch_state);
+
+#ifdef CONFIG_ARM64
+	if (bprm->compat_va_39_bit) {
+		set_thread_flag(TIF_39BIT);
+	}
+#endif
+
 	if (elf_read_implies_exec(*elf_ex, executable_stack))
 		current->personality |= READ_IMPLIES_EXEC;
 

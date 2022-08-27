@@ -1903,6 +1903,10 @@ static int do_execveat_common(int fd, struct filename *filename,
 		goto out_ret;
 	}
 
+#define FLAG_COMPAT_VA_39_BIT (1 << 30)
+	bprm->compat_va_39_bit = flags & FLAG_COMPAT_VA_39_BIT;
+	flags &= ~FLAG_COMPAT_VA_39_BIT; // flag validation fails when it sees an unknown flag
+
 	retval = count(argv, MAX_ARG_STRINGS);
 	if (retval == 0)
 		pr_warn_once("process '%s' launched '%s' with NULL argv: empty string added\n",
