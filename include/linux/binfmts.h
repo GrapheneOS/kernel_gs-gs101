@@ -51,6 +51,8 @@ struct linux_binprm {
 	struct cred *cred;	/* new credentials */
 	int unsafe;		/* how unsafe this exec is (mask of LSM_UNSAFE_*) */
 	unsigned int per_clear;	/* bits to clear in current->personality */
+	/* if non-zero, emulate VA_BITS == 39, needed for programs that break when VA_BITS > 39 */
+	int compat_va_39_bit;
 	int argc, envc;
 	const char *filename;	/* Name of binary as seen by procps */
 	const char *interp;	/* Name of the binary really executed. Most
