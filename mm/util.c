@@ -383,6 +383,10 @@ unsigned long arch_mmap_rnd(void)
 #ifdef CONFIG_HAVE_ARCH_MMAP_RND_COMPAT_BITS
 	if (is_compat_task())
 		rnd = get_random_long() & ((1UL << mmap_rnd_compat_bits) - 1);
+#ifdef CONFIG_ARM64
+	else if (test_thread_flag(TIF_39BIT))
+		rnd = get_random_long() & ((1UL << MMAP_RND_BITS_39_BIT) - 1);
+#endif
 	else
 #endif /* CONFIG_HAVE_ARCH_MMAP_RND_COMPAT_BITS */
 		rnd = get_random_long() & ((1UL << mmap_rnd_bits) - 1);
