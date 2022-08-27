@@ -56,6 +56,7 @@
 
 #define DEFAULT_MAP_WINDOW_64	(UL(1) << VA_BITS_MIN)
 #define TASK_SIZE_64		(UL(1) << vabits_actual)
+#define TASK_SIZE_39		(UL(1) << 39)
 
 #ifdef CONFIG_COMPAT
 #if defined(CONFIG_ARM64_64K_PAGES) && defined(CONFIG_KUSER_HELPERS)
@@ -68,11 +69,11 @@
 #define TASK_SIZE_32		(UL(0x100000000) - PAGE_SIZE)
 #endif /* CONFIG_ARM64_64K_PAGES */
 #define TASK_SIZE		(test_thread_flag(TIF_32BIT) ? \
-				TASK_SIZE_32 : TASK_SIZE_64)
+				TASK_SIZE_32 : (test_thread_flag(TIF_39BIT) ? TASK_SIZE_39 : TASK_SIZE_64))
 #define TASK_SIZE_OF(tsk)	(test_tsk_thread_flag(tsk, TIF_32BIT) ? \
-				TASK_SIZE_32 : TASK_SIZE_64)
+				TASK_SIZE_32 : (test_tsk_thread_flag(tsk, TIF_39BIT) ? TASK_SIZE_39 : TASK_SIZE_64))
 #define DEFAULT_MAP_WINDOW	(test_thread_flag(TIF_32BIT) ? \
-				TASK_SIZE_32 : DEFAULT_MAP_WINDOW_64)
+				TASK_SIZE_32 : (test_thread_flag(TIF_39BIT) ? TASK_SIZE_39 : DEFAULT_MAP_WINDOW_64))
 #else
 #define TASK_SIZE		TASK_SIZE_64
 #define DEFAULT_MAP_WINDOW	DEFAULT_MAP_WINDOW_64
@@ -89,7 +90,7 @@
 #ifdef CONFIG_COMPAT
 #define AARCH32_VECTORS_BASE	0xffff0000
 #define STACK_TOP		(test_thread_flag(TIF_32BIT) ? \
-				AARCH32_VECTORS_BASE : STACK_TOP_MAX)
+				AARCH32_VECTORS_BASE : (test_thread_flag(TIF_39BIT) ? TASK_SIZE_39 : STACK_TOP_MAX))
 #else
 #define STACK_TOP		STACK_TOP_MAX
 #endif /* CONFIG_COMPAT */

@@ -130,7 +130,11 @@
 #ifdef CONFIG_ARM64_FORCE_52BIT
 #define ELF_ET_DYN_BASE		(2 * TASK_SIZE_64 / 3)
 #else
-#define ELF_ET_DYN_BASE		(2 * DEFAULT_MAP_WINDOW_64 / 3)
+/*
+ * Originally used DEFAULT_MAP_WINDOW_64, switched to DEFAULT_MAP_WINDOW for compatibility with 39-bit mode.
+ * Will return the value of DEFAULT_MAP_WINDOW_64 if compat_va_39_bit is not enabled.
+ */
+#define ELF_ET_DYN_BASE		(2 * DEFAULT_MAP_WINDOW / 3)
 #endif /* CONFIG_ARM64_FORCE_52BIT */
 
 #ifndef __ASSEMBLY__
@@ -186,11 +190,17 @@ struct linux_binprm;
 extern int arch_setup_additional_pages(struct linux_binprm *bprm,
 				       int uses_interp);
 
+// same as mmap_rnd_bits when VA_BITS == 39
+#define MMAP_RND_BITS_39_BIT 24
+
 /* 1GB of VA */
 #ifdef CONFIG_COMPAT
 #define STACK_RND_MASK			(test_thread_flag(TIF_32BIT) ? \
 						((1UL << mmap_rnd_compat_bits) - 1) >> (PAGE_SHIFT - 12) : \
-						((1UL << mmap_rnd_bits) - 1) >> (PAGE_SHIFT - 12))
+							(test_thread_flag(TIF_39BIT) ? \
+							((1UL << MMAP_RND_BITS_39_BIT) - 1) >> (PAGE_SHIFT - 12) : \
+							((1UL << mmap_rnd_bits) - 1) >> (PAGE_SHIFT - 12)))
+
 #else
 #define STACK_RND_MASK			(((1UL << mmap_rnd_bits) - 1) >> (PAGE_SHIFT - 12))
 #endif
