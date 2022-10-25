@@ -2,7 +2,7 @@
 # Cloudripper add-on configs
 #
 
-# CONFIG_MODULE_SIG is not set
+# CONFIG_MODULE_SIG_ALL is not set
 CONFIG_ACPM_DVFS=m
 CONFIG_ACPM_FLEXPMU_DBG=m
 CONFIG_ACPM_MBOX_TEST=m
