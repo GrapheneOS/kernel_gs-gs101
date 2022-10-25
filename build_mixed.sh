@@ -145,3 +145,8 @@ else
 fi
 
 build_device_kernel "$@"
+
+find ${DIST_DIR} -type f -name "*.ko" \
+  -exec ${BASE_OUT}/${GKI_KERNEL_OUT_DIR}/aosp/scripts/sign-file sha256 \
+  ${BASE_OUT}/${GKI_KERNEL_OUT_DIR}/aosp/certs/signing_key.pem \
+  ${BASE_OUT}/${GKI_KERNEL_OUT_DIR}/aosp/certs/signing_key.x509 {} \;
