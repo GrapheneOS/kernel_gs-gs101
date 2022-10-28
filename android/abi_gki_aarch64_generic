@@ -320,6 +320,7 @@
   crc32_le
   crc8
   crc8_populate_msb
+  creds_are_invalid
   crypto_aead_decrypt
   crypto_aead_encrypt
   crypto_aead_setauthsize
@@ -1108,6 +1109,7 @@
   interval_tree_remove
   int_sqrt
   int_to_scsilun
+  __invalid_creds
   iomem_resource
   iommu_alloc_resv_region
   iommu_attach_group
