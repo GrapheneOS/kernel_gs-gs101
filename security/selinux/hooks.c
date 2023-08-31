@@ -1693,6 +1693,66 @@ static int cred_has_capability(const struct cred *cred,
 	return rc;
 }
 
+static int selinux_inode_check_tsec_flags(
+	struct selinux_state *s, const struct cred *cred,
+	struct inode_security_struct *isec, u32 perms,
+	struct common_audit_data *adp)
+{
+	int rc;
+	u32 inode_type;
+	u64 flags = cred_tsec_flags(cred);
+	u64 denied_flags = 0;
+	char *flag_str = NULL;
+
+	if (perms & FILE__EXECMOD) {
+		if (flags & TSEC_FLAG_DENY_EXECMOD) {
+			audit_log_tsec_flag_denial(TSEC_FLAG_DENY_EXECMOD, adp);
+			return -EACCES;
+		}
+	}
+
+	if (perms & FILE__EXECUTE) {
+		if (!(flags & TSEC_ALL_DENY_EXECUTE_FLAGS)) {
+			// none of the DENY_EXEC_* flags are set
+			return 0;
+		}
+		rc = get_type_from_sid(isec->sid, &inode_type);
+
+		if (rc) {
+			pr_warn("unknown type for sid %i, inode %lu\n", isec->sid, isec->inode->i_ino);
+			// This function is called only if the regular SELinux check returned "allowed". If SELinux is configured
+			// to deny this inode operation on inodes with unknown contexts, it would already be denied and this code
+			// would not be reached.
+			return 0;
+		}
+
+#define DENY_FLAG(s) denied_flags = s; flag_str = #s
+
+		if (inode_type == s->types.appdomain_tmpfs) {
+			DENY_FLAG(TSEC_FLAG_DENY_EXECUTE_APPDOMAIN_TMPFS);
+		} else if (inode_type == s->types.app_data_file) {
+			DENY_FLAG(TSEC_FLAG_DENY_EXECUTE_APP_DATA_FILE);
+		} else if (inode_type == s->types.ashmem_device) {
+			DENY_FLAG(TSEC_FLAG_DENY_EXECUTE_ASHMEM_DEVICE);
+		} else if (inode_type == s->types.ashmem_libcutils_device) {
+			DENY_FLAG(TSEC_FLAG_DENY_EXECUTE_ASHMEM_LIBCUTILS_DEVICE);
+		} else if (inode_type == s->types.privapp_data_file) {
+			DENY_FLAG(TSEC_FLAG_DENY_EXECUTE_PRIVAPP_DATA_FILE);
+		} else {
+			return 0;
+		}
+
+#undef DENY_FLAG
+
+		if (flags & denied_flags) {
+			audit_log_tsec_flag_denial_inner(flag_str, adp);
+			return -EACCES;
+		}
+	}
+
+	return 0;
+}
+
 /* Check whether a task has a particular permission to an inode.
    The 'adp' parameter is optional and allows other audit
    data to be passed (e.g. the dentry). */
@@ -1703,6 +1763,7 @@ static int inode_has_perm(const struct cred *cred,
 {
 	struct inode_security_struct *isec;
 	u32 sid;
+	int rc;
 
 	validate_creds(cred);
 
@@ -1712,8 +1773,13 @@ static int inode_has_perm(const struct cred *cred,
 	sid = cred_sid(cred);
 	isec = selinux_inode(inode);
 
-	return avc_has_perm(&selinux_state,
+	rc = avc_has_perm(&selinux_state,
 			    sid, isec->sid, isec->sclass, perms, adp);
+
+	if (!rc) {
+		rc = selinux_inode_check_tsec_flags(&selinux_state, cred, isec, perms, adp);
+	}
+	return rc;
 }
 
 /* Same as inode_has_perm, but pass explicit audit data containing
@@ -2366,6 +2432,7 @@ static int selinux_bprm_creds_for_exec(struct linux_binprm *bprm)
 	struct common_audit_data ad;
 	struct inode *inode = file_inode(bprm->file);
 	int rc;
+	u32 inode_context_type;
 
 	/* SELinux context only depends on initial program or script and not
 	 * the script interpreter */
@@ -2418,6 +2485,17 @@ static int selinux_bprm_creds_for_exec(struct linux_binprm *bprm)
 				  SECCLASS_FILE, FILE__EXECUTE_NO_TRANS, &ad);
 		if (rc)
 			return rc;
+
+		if (old_tsec->flags & TSEC_FLAG_DENY_EXECUTE_NO_TRANS_APP_DATA_FILE) {
+			rc = get_type_from_sid(isec->sid, &inode_context_type);
+			if (rc)
+				return rc;
+
+			if (inode_context_type == selinux_state.types.app_data_file) {
+				audit_log_tsec_flag_denial(TSEC_FLAG_DENY_EXECUTE_NO_TRANS_APP_DATA_FILE, &ad);
+				return -EACCES;
+			}
+		}
 	} else {
 		/* Check permissions for the transition. */
 		rc = avc_has_perm(&selinux_state,
@@ -3177,6 +3255,11 @@ static int selinux_inode_permission(struct inode *inode, int mask)
 				  sid, isec->sid, isec->sclass, perms,
 				  no_block ? AVC_NONBLOCKING : 0,
 				  &avd);
+
+	if (!rc) {
+		rc = selinux_inode_check_tsec_flags(&selinux_state, cred, isec, perms, NULL);
+	}
+
 	audited = avc_audit_required(perms, &avd, rc,
 				     from_access ? FILE__AUDIT_ACCESS : 0,
 				     &denied);
@@ -3798,6 +3881,14 @@ static int file_map_prot_check(struct file *file, unsigned long prot, int shared
 		rc = avc_has_perm(&selinux_state,
 				  sid, sid, SECCLASS_PROCESS,
 				  PROCESS__EXECMEM, NULL);
+
+		if (!rc) {
+			if (cred_tsec_flags(cred) & TSEC_FLAG_DENY_EXECMEM) {
+				audit_log_tsec_flag_denial(TSEC_FLAG_DENY_EXECMEM, NULL);
+				rc = -EACCES;
+			}
+		}
+
 		if (rc)
 			goto error;
 	}
