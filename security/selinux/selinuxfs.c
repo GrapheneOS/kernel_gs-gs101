@@ -629,6 +629,11 @@ static int resolve_context_types(struct selinux_load_state *lstate, struct conte
 
 #define RESOLVE_TYPE(t) rc = resolve_context_type(lstate, #t, &types->t); if (rc) return rc
 
+	RESOLVE_TYPE(app_data_file);
+	RESOLVE_TYPE(appdomain_tmpfs);
+	RESOLVE_TYPE(ashmem_device);
+	RESOLVE_TYPE(ashmem_libcutils_device);
+	RESOLVE_TYPE(privapp_data_file);
 	RESOLVE_TYPE(webview_zygote);
 	RESOLVE_TYPE(zygote);
 
