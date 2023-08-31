@@ -88,6 +88,11 @@ struct selinux_avc;
 struct selinux_policy;
 
 struct context_types {
+	u32 app_data_file;
+	u32 appdomain_tmpfs;
+	u32 ashmem_device;
+	u32 ashmem_libcutils_device;
+	u32 privapp_data_file;
 	u32 webview_zygote;
 	u32 zygote;
 };
