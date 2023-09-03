@@ -35,7 +35,10 @@ struct task_security_struct {
 	u32 create_sid;		/* fscreate SID */
 	u32 keycreate_sid;	/* keycreate SID */
 	u32 sockcreate_sid;	/* fscreate SID */
+	u64 flags;
 } __randomize_layout;
+
+#define TSEC_ALL_FLAGS (0)
 
 enum label_initialized {
 	LABEL_INVALID,		/* invalid or not initialized */
