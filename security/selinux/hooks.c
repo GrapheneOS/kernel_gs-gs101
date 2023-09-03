@@ -229,6 +229,19 @@ static inline u32 cred_sid(const struct cred *cred)
 	return tsec->sid;
 }
 
+static inline u64 cred_tsec_flags(const struct cred *cred)
+{
+	const struct task_security_struct *tsec;
+
+	tsec = selinux_cred(cred);
+	return tsec->flags;
+}
+
+static int get_type_from_sid(u32 sid, u32 *out)
+{
+	return security_sid_to_context_type(&selinux_state, sid, out);
+}
+
 /*
  * get the objective security ID of a task
  */
@@ -6394,6 +6407,7 @@ static int selinux_getprocattr(struct task_struct *p,
 {
 	const struct task_security_struct *__tsec;
 	u32 sid;
+	u64 flags;
 	int error;
 	unsigned len;
 
@@ -6420,11 +6434,25 @@ static int selinux_getprocattr(struct task_struct *p,
 		sid = __tsec->keycreate_sid;
 	else if (!strcmp(name, "sockcreate"))
 		sid = __tsec->sockcreate_sid;
+	else if (!strcmp(name, "selinux_flags"))
+		flags = __tsec->flags;
 	else {
 		error = -EINVAL;
 		goto bad;
 	}
 	rcu_read_unlock();
+
+	if (!strcmp(name, "selinux_flags")) {
+		size_t len = 16 + 1;
+		// freed by the caller
+		char *buf = kzalloc(len, GFP_KERNEL);
+		if (!buf) {
+			return -ENOMEM;
+		}
+		len = snprintf(buf, len, "%llx", flags);
+		*value = buf;
+		return (int) len;
+	}
 
 	if (!sid)
 		return 0;
@@ -6443,9 +6471,10 @@ static int selinux_setprocattr(const char *name, void *value, size_t size)
 {
 	struct task_security_struct *tsec;
 	struct cred *new;
-	u32 mysid = current_sid(), sid = 0, ptsid;
+	u32 mysid = current_sid(), sid = 0, ptsid, context_type = 0;
 	int error;
 	char *str = value;
+	u64 flags;
 
 	/*
 	 * Basic control over ability to set these attributes at all.
@@ -6466,7 +6495,7 @@ static int selinux_setprocattr(const char *name, void *value, size_t size)
 		error = avc_has_perm(&selinux_state,
 				     mysid, mysid, SECCLASS_PROCESS,
 				     PROCESS__SETSOCKCREATE, NULL);
-	else if (!strcmp(name, "current"))
+	else if (!strcmp(name, "current") || !strcmp(name, "selinux_flags"))
 		error = avc_has_perm(&selinux_state,
 				     mysid, mysid, SECCLASS_PROCESS,
 				     PROCESS__SETCURRENT, NULL);
@@ -6476,7 +6505,7 @@ static int selinux_setprocattr(const char *name, void *value, size_t size)
 		return error;
 
 	/* Obtain a SID for the context, if one was specified. */
-	if (size && str[0] && str[0] != '\n') {
+	if (size && str[0] && str[0] != '\n' && strcmp(name, "selinux_flags")) {
 		if (str[size-1] == '\n') {
 			str[size-1] = 0;
 			size--;
@@ -6569,6 +6598,37 @@ static int selinux_setprocattr(const char *name, void *value, size_t size)
 		}
 
 		tsec->sid = sid;
+	} else if (!strcmp(name, "selinux_flags")) {
+		error = get_type_from_sid(mysid, &context_type);
+		if (error) {
+			goto abort_change;
+		}
+
+		if (context_type != selinux_state.types.zygote &&
+			context_type != selinux_state.types.webview_zygote
+		) {
+			pr_err("selinux_flags: attempt to set from an unknown context, pid %i\n", current->pid);
+			error = -EPERM;
+			goto abort_change;
+		}
+
+		if (size >= 2 && str[size - 1] == 0) {
+			if (kstrtou64(str, 16, &flags)) {
+				error = -EINVAL;
+				goto abort_change;
+			}
+		} else {
+			error = -EINVAL;
+			goto abort_change;
+		}
+
+		if ((flags & TSEC_ALL_FLAGS) != flags) {
+			pr_warn("selinux_flags: unknown flags %llu\n", flags & ~TSEC_ALL_FLAGS);
+			error = -EINVAL;
+			goto abort_change;
+		}
+
+		tsec->flags = flags;
 	} else {
 		error = -EINVAL;
 		goto abort_change;
