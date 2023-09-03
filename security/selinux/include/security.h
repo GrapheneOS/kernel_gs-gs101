@@ -329,6 +329,8 @@ int security_change_sid(struct selinux_state *state, u32 ssid, u32 tsid,
 int security_sid_to_context(struct selinux_state *state, u32 sid,
 			    char **scontext, u32 *scontext_len);
 
+int security_sid_to_context_type(struct selinux_state *state, u32 sid, u32 *out);
+
 int security_sid_to_context_force(struct selinux_state *state,
 				  u32 sid, char **scontext, u32 *scontext_len);
 
