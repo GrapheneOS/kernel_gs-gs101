@@ -205,7 +205,7 @@ static inline void print_ipv4_addr(struct audit_buffer *ab, __be32 addr,
  * @a : common audit data
  *
  */
-static void dump_common_audit_data(struct audit_buffer *ab,
+void dump_common_audit_data(struct audit_buffer *ab,
 				   struct common_audit_data *a)
 {
 	char comm[sizeof(current->comm)];
