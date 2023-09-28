@@ -242,6 +242,51 @@ static int get_type_from_sid(u32 sid, u32 *out)
 	return security_sid_to_context_type(&selinux_state, sid, out);
 }
 
+static void audit_log_tsec_flag_denial_inner(const char *prefix, struct common_audit_data *adp)
+{
+	kuid_t uid;
+	pid_t tgid;
+	// Apps are allowed to fork() their processes. If process parent is an isolated process, there's no good way to
+	// determine after child process death which app UID it belonged to, since isolated process UID is separate from
+	// app UID.
+	// Adding tgid of the top-most process with the same uid as current process to audit message allows to attribute
+	// such processes to their apps, since top-most processes are always spawned and managed by the OS (see difference
+	// between ProcessRecord and PhantomProcessRecord in Android system_server code).
+	pid_t top_tgid_with_same_uid;
+	struct task_struct *cur;
+	struct task_struct *parent;
+	struct audit_buffer *ab;
+
+	rcu_read_lock();
+	cur = current;
+	uid = __task_cred(cur)->uid;
+	tgid = task_tgid_nr(cur);
+	top_tgid_with_same_uid = tgid;
+	parent = cur->parent;
+	while (parent != NULL && uid_eq(__task_cred(parent)->uid, uid)) {
+		top_tgid_with_same_uid = task_tgid_nr(parent);
+		parent = parent->parent;
+	}
+	rcu_read_unlock();
+
+	ab = audit_log_start(audit_context(), GFP_ATOMIC | __GFP_NOWARN, AUDIT_SELINUX_TSEC_FLAG_DENIAL);
+
+	if (ab == NULL) {
+		return;
+	}
+
+	audit_log_format(ab, "%s: op denied, uid %u, pid %i, top_pid_with_same_uid %i,", prefix, __kuid_val(uid),
+		tgid, top_tgid_with_same_uid);
+
+	if (adp) {
+		dump_common_audit_data(ab, adp);
+	}
+
+	audit_log_end(ab);
+}
+
+#define audit_log_tsec_flag_denial(f, adp) audit_log_tsec_flag_denial_inner(#f, adp)
+
 /*
  * get the objective security ID of a task
  */
