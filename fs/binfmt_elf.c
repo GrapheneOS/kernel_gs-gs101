@@ -1006,6 +1006,8 @@ out_free_interp:
 #ifdef CONFIG_ARM64
 	if (bprm->compat_va_39_bit) {
 		set_thread_flag(TIF_39BIT);
+	} else {
+		clear_thread_flag(TIF_39BIT);
 	}
 #endif
 
