@@ -46,6 +46,7 @@ struct max77759_plat {
 	enum typec_cc_polarity polarity;
 	/* protects tcpc_enable_data_path */
 	struct mutex data_path_lock;
+	bool data_path_enabled;
 	/* Vote for data from BC1.2 */
 	bool bc12_data_capable;
 	/* Infered from pd caps */
