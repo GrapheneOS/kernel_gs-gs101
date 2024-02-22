@@ -328,6 +328,8 @@ struct tcpm_port {
 	bool pd_supported;
 	enum typec_port_type port_type;
 
+	bool ignore_alt_modes;
+
 	/*
 	 * Set to true when vbus is greater than VSAFE5V min.
 	 * Set to false when vbus falls below vSinkDisconnect max threshold.
@@ -1822,7 +1824,11 @@ static void tcpm_handle_vdm_request(struct tcpm_port *port,
 		port->vdm_state = VDM_STATE_DONE;
 	}
 
-	if (PD_VDO_SVDM(p[0]) && (adev || tcpm_vdm_ams(port) || port->nr_snk_vdo)) {
+	if (port->ignore_alt_modes) {
+		tcpm_log(port, "tcpm_handle_vdm_request: ignore_alt_modes is set");
+	}
+
+	if (PD_VDO_SVDM(p[0]) && (adev || tcpm_vdm_ams(port) || port->nr_snk_vdo) && !port->ignore_alt_modes) {
 		/*
 		 * Here a SVDM is received (INIT or RSP or unknown). Set the vdm_sm_running in
 		 * advance because we are dropping the lock but may send VDMs soon.
@@ -6290,10 +6296,19 @@ static int tcpm_copy_pdos(u32 *dest_pdo, const u32 *src_pdo, unsigned int nr_pdo
 	return nr_pdo;
 }
 
+#define DO_NOT_IGNORE_ALT_MODES (UINT_MAX - 1)
+#define IGNORE_ALT_MODES (UINT_MAX)
+
 int tcpm_update_sink_capabilities(struct tcpm_port *port, const u32 *pdo, unsigned int nr_pdo,
 				  unsigned int operating_snk_mw)
 {
 	int ret = 0;
+
+	// reuse tcpm_update_sink_capabilities to avoid changing ABI
+	if (nr_pdo == DO_NOT_IGNORE_ALT_MODES || nr_pdo == IGNORE_ALT_MODES) {
+		port->ignore_alt_modes = nr_pdo == IGNORE_ALT_MODES;
+		return 0;
+	}
 
 	if (tcpm_validate_caps(port, pdo, nr_pdo))
 		return -EINVAL;
