@@ -2876,6 +2876,8 @@ static int max77759_probe(struct i2c_client *client,
 	if (modparam_disable_cc_toggling_by_default)
 		cc_toggle_enable_set(chip, 0);
 
+	chip->data_path_enabled = true;
+
 	/* Chip level tcpci callbacks */
 	chip->data.set_vbus = max77759_set_vbus;
 	chip->data.start_drp_toggling = max77759_start_toggling;
